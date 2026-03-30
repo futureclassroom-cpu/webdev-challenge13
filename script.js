@@ -1,224 +1,326 @@
 // ======================================
-// API KEY (NOTE: sebaiknya di backend)
+// API KEY FOR GOOGLE GEMINI
+// Get your own from: https://aistudio.google.com/app/apikey
 // ======================================
-const GEMINI_API_KEY = "AIzaSyA_E0Fa4ypm8hmalEEu46QEK7LJcyMMkJw";
+const GEMINI_API_KEY = "AIzaSyBJvF-Wr24nwOSaTOexuIvVkUjKt1wCkJ0";
 
 // ======================================
 // SAMPLE TOPICS
 // ======================================
 const TOPICS = {
-  study: "I usually study late at night, often past midnight. I struggle to stay focused and feel exhausted the next morning.",
-  sleep: "I only sleep 5–6 hours on weekdays. I scroll my phone for at least an hour before bed every night.",
-  screen: "I spend 8 hours on a computer for work, then another 3–4 hours at night on my phone watching videos and browsing.",
+  study:    "I usually study late at night, often past midnight. I struggle to stay focused and feel exhausted the next morning.",
+  sleep:    "I only sleep 5–6 hours on weekdays. I scroll my phone for at least an hour before bed every night.",
+  screen:   "I spend 8 hours on a computer for work, then another 3–4 hours at night on my phone watching videos and browsing.",
   exercise: "I barely exercise — maybe once or twice a month. I sit at my desk all day and take the elevator instead of the stairs."
 };
 
-// ======================================
-// RATE LIMIT
-// ======================================
+// Rate limiting variables
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 5000;
+const MIN_REQUEST_INTERVAL = 5000; // Wait 5 seconds between requests
+
 
 // ======================================
-// FILL TOPIC
+// FILL TOPIC - When user clicks a sample topic button
 // ======================================
 function fillTopic(clickedButton, topicKey) {
+  // Get the text input field
   const inputField = document.getElementById('habitInput');
+  
+  // Put the sample text into the input
   inputField.value = TOPICS[topicKey];
+  
+  // Update the character counter
   onType(inputField);
-
-  document.querySelectorAll('.chip').forEach(btn => btn.classList.remove('active'));
+  
+  // Remove active style from all topic buttons
+  const allButtons = document.querySelectorAll('.chip');
+  for (let i = 0; i < allButtons.length; i = i + 1) {
+    allButtons[i].classList.remove('active');
+  }
+  
+  // Add active style to the clicked button
   clickedButton.classList.add('active');
 }
 
+
 // ======================================
-// ON TYPE
+// ON TYPE - Update character counter when typing
 // ======================================
 function onType(inputElement) {
-  const hint = document.getElementById('charHint');
-  const clearBtn = document.getElementById('clearBtn');
-
-  const len = inputElement.value.trim().length;
-
-  hint.textContent = len === 0 ? 'Start typing…' : len + ' characters';
-  hint.classList.toggle('active', len > 0);
-  clearBtn.style.display = len > 0 ? 'inline' : 'none';
+  // Get the hint text element
+  const hintElement = document.getElementById('charHint');
+  
+  // Get the clear button
+  const clearButton = document.getElementById('clearBtn');
+  
+  // Count the characters typed
+  const textLength = inputElement.value.trim().length;
+  
+  // Update the hint text
+  if (textLength === 0) {
+    hintElement.textContent = 'Start typing…';
+  } else {
+    hintElement.textContent = inputElement.value.length + ' characters';
+  }
+  
+  // Show/hide the hint
+  if (textLength > 0) {
+    hintElement.classList.add('active');
+  } else {
+    hintElement.classList.remove('active');
+  }
+  
+  // Show/hide the clear button
+  if (textLength > 0) {
+    clearButton.style.display = 'inline';
+  } else {
+    clearButton.style.display = 'none';
+  }
 }
 
+
 // ======================================
-// CLEAR INPUT
+// CLEAR INPUT - Empty the text field
 // ======================================
 function clearInput() {
-  const input = document.getElementById('habitInput');
-  input.value = '';
-  onType(input);
-
-  document.querySelectorAll('.chip').forEach(btn => btn.classList.remove('active'));
-  input.focus();
+  // Get the input field
+  const inputField = document.getElementById('habitInput');
+  
+  // Clear the text
+  inputField.value = '';
+  
+  // Update the counter
+  onType(inputField);
+  
+  // Remove active style from all topic buttons
+  const allButtons = document.querySelectorAll('.chip');
+  for (let i = 0; i < allButtons.length; i = i + 1) {
+    allButtons[i].classList.remove('active');
+  }
+  
+  // Focus on the input field
+  inputField.focus();
 }
 
+
+
 // ======================================
-// MAIN FUNCTION
+// GENERATE REFLECTION - Main function
 // ======================================
 function generateReflection() {
-
+  // Get the text from input
   const userText = document.getElementById('habitInput').value.trim();
-
-  if (!userText) {
+  
+  // Check if input is empty
+  if (userText === '') {
     shakeForm();
     return;
   }
-
-  const now = Date.now();
-  if (now - lastRequestTime < MIN_REQUEST_INTERVAL) {
-    alert("Please wait a few seconds...");
+  
+  // Check if we should wait before making another request
+  const currentTime = Date.now();
+  const timePassed = currentTime - lastRequestTime;
+  
+  if (timePassed < MIN_REQUEST_INTERVAL) {
+    const waitSeconds = Math.ceil((MIN_REQUEST_INTERVAL - timePassed) / 1000);
+    alert('Please wait ' + waitSeconds + ' seconds before trying again.');
     return;
   }
-
-  lastRequestTime = now;
-
+  
+  // Save the time of this request
+  lastRequestTime = currentTime;
+  
+  // Show loading state
   setBtnLoading(true);
   showLoading();
-
-  sendToGemini(userText);
+  
+  // Create the message to send to Gemini
+  const message = 'You are a helpful lifestyle coach. The user says: ' + userText + 
+                  ' Give one reflection question and one improvement suggestion in simple JSON format.';
+  
+  // Send request to Gemini API
+  sendToGemini(message);
 }
 
+
 // ======================================
-// 🔥 GEMINI API (FULL FIX)
+// SEND TO GEMINI - Make API request
 // ======================================
-function sendToGemini(userText) {
-
-  const message = `
-Return ONLY JSON. No explanation.
-
-Format:
-{
-  "question": "string",
-  "suggestion": "string"
-}
-
-User:
-${userText}
-`;
-
+function sendToGemini(message) {
+  // Prepare the request data
+  const requestData = {
+    contents: [
+      {
+        parts: [
+          {
+            text: message
+          }
+        ]
+      }
+    ]
+  };
+  
+  // Make the API request
   fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + GEMINI_API_KEY,
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_API_KEY,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: message }] }]
-      })
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
     }
   )
-  .then(async res => {
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+  .then(function(response) {
+    // Check if response is OK
+    if (response.ok) {
+      return response.json();
+    } else {
+      throw new Error('API returned status ' + response.status);
+    }
   })
-  .then(data => {
-
-    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!text) throw new Error("No response from AI");
-
-    console.log("RAW:", text);
-
-    // ======================================
-    // CLEAN RESPONSE (ANTI ERROR)
-    // ======================================
-    text = text
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    const match = text.match(/\{[\s\S]*\}/);
-
-    if (!match) throw new Error("Invalid JSON format");
-
-    let result;
-
-    try {
-      result = JSON.parse(match[0]);
-    } catch {
-      result = {
-        question: "What habit would you like to improve first?",
-        suggestion: "Start with small changes step by step."
-      };
-    }
-
-    if (!result.question || !result.suggestion) {
-      throw new Error("Incomplete AI response");
-    }
-
+  .then(function(data) {
+    // Get the text response from Gemini
+    const textResponse = data.candidates[0].content.parts[0].text;
+    
+    // Try to parse the JSON
+    const result = JSON.parse(textResponse);
+    
+    // Show the results
     showResult(result.question, result.suggestion);
-
   })
-  .catch(err => {
-    console.error(err);
-    showError("Error: " + err.message);
+  .catch(function(error) {
+    // Show error message
+    showError('Error: ' + error.message);
   })
-  .finally(() => setBtnLoading(false));
+  .finally(function() {
+    // Reset button
+    setBtnLoading(false);
+  });
 }
 
+
+
+
 // ======================================
-// BUTTON LOADING
+// SET BUTTON LOADING - Show/hide loading state on button
 // ======================================
 function setBtnLoading(isLoading) {
-  const btn = document.getElementById('generateBtn');
-
-  btn.disabled = isLoading;
-  btn.innerHTML = isLoading
-    ? "Thinking..."
-    : "Generate Reflection";
+  const button = document.getElementById('generateBtn');
+  
+  if (isLoading) {
+    button.disabled = true;
+    button.innerHTML = '<span>Thinking…</span>';
+  } else {
+    button.disabled = false;
+    button.innerHTML = '<i class="bi bi-stars me-2"></i>Generate Reflection';
+  }
 }
 
+
 // ======================================
-// LOADING UI
+// SHOW LOADING - Display loading animation
 // ======================================
 function showLoading() {
-  const area = document.getElementById('result-area');
-  area.style.display = 'block';
-  area.innerHTML = "<p>Thinking...</p>";
+  const resultArea = document.getElementById('result-area');
+  
+  resultArea.style.display = 'block';
+  resultArea.innerHTML = '<div class="loading-state"><div class="loader-track"><div class="loader-fill"></div></div><p>Gemini is reflecting on your lifestyle…</p></div>';
+  
+  // Scroll to show the loading message
+  resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+
 // ======================================
-// RESULT
+// SHOW RESULT - Display the AI response
 // ======================================
-function showResult(q, s) {
-  const area = document.getElementById('result-area');
-
-  area.innerHTML = `
-    <h3>Reflection Question</h3>
-    <p>${q}</p>
-
-    <h3>Suggestion</h3>
-    <p>${s}</p>
-
-    <button onclick="resetAll()">Try Again</button>
-  `;
+function showResult(question, suggestion) {
+  const resultArea = document.getElementById('result-area');
+  
+  // Create the HTML to show
+  const html = '<div class="result-header"><div class="result-header-line"></div><span class="result-header-label">Your reflection</span><div class="result-header-line"></div></div>' +
+               '<div class="result-row"><div class="rr-type q"><span class="rr-icon"><i class="bi bi-question-lg"></i></span>Reflection Question</div><p class="rr-text">' + question + '</p></div>' +
+               '<div class="result-row"><div class="rr-type s"><span class="rr-icon"><i class="bi bi-lightbulb-fill"></i></span>Suggestion for Improvement</div><p class="rr-text">' + suggestion + '</p></div>' +
+               '<div class="try-again-row"><button class="btn-try-again" onclick="resetAll()"><i class="bi bi-arrow-counterclockwise"></i> Try another habit</button></div>';
+  
+  resultArea.style.display = 'block';
+  resultArea.innerHTML = html;
+  
+  // Scroll to show the result
+  resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// ======================================
-// ERROR
-// ======================================
-function showError(msg) {
-  const area = document.getElementById('result-area');
-  area.innerHTML = `<p style="color:red">${msg}</p>`;
-}
 
 // ======================================
-// RESET
+// SHOW ERROR - Display error message
+// ======================================
+function showError(errorMessage) {
+  const resultArea = document.getElementById('result-area');
+  
+  const html = '<div class="error-state"><i class="bi bi-exclamation-triangle-fill"></i><span>' + errorMessage + '</span></div>';
+  
+  resultArea.style.display = 'block';
+  resultArea.innerHTML = html;
+}
+
+
+// ======================================
+// RESET ALL - Clear everything and start fresh
 // ======================================
 function resetAll() {
+  // Clear input field
   clearInput();
-  document.getElementById('result-area').style.display = 'none';
+  
+  // Hide results
+  const resultArea = document.getElementById('result-area');
+  resultArea.style.display = 'none';
+  resultArea.innerHTML = '';
+  
+  // Scroll back to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+
 // ======================================
-// SHAKE
+// SHAKE FORM - Animated shake when input is empty
 // ======================================
 function shakeForm() {
+  // Get the form element
   const form = document.querySelector('.form-surface');
-  form.style.transform = 'translateX(5px)';
-  setTimeout(() => form.style.transform = 'none', 200);
+  
+  // Reset animation
+  form.style.animation = 'none';
+  form.style.transform = 'translateX(0)';
+  
+  // Variables for shake animation
+  let shakeCount = 0;
+  let shakeDirection = 1;
+  
+  // Create shake effect
+  const shakeInterval = setInterval(function() {
+    form.style.transform = 'translateX(' + (shakeDirection * 5) + 'px)';
+    shakeDirection = shakeDirection * -1;
+    shakeCount = shakeCount + 1;
+    
+    // Stop after 8 shakes
+    if (shakeCount > 7) {
+      clearInterval(shakeInterval);
+      form.style.transform = 'none';
+    }
+  }, 55);
+  
+  // Get the input field
+  const inputField = document.getElementById('habitInput');
+  
+  // Turn the border red
+  inputField.style.borderBottomColor = '#ff6464';
+  
+  // Turn it back to normal after 1.2 seconds
+  setTimeout(function() {
+    inputField.style.borderBottomColor = '';
+  }, 1200);
+  
+  // Focus on the input
+  inputField.focus();
 }
