@@ -2,7 +2,7 @@
 // API KEY FOR GOOGLE GEMINI
 // Get your own from: https://aistudio.google.com/app/apikey
 // ======================================
-const GEMINI_API_KEY = "AIzaSyBJvF-Wr24nwOSaTOexuIvVkUjKt1wCkJ0";
+const GEMINI_API_KEY = "AIzaSyCX7nRI1tpPTM1HDBezYUvnc7s-vi2xkQg";
 
 // ======================================
 // SAMPLE TOPICS
